@@ -50,15 +50,14 @@ func (s LINQ) Prepend(items ...T) LINQ {
 
 func concatSequence(seq Sequence, sequences []Sequence) Sequence {
 	return MakeFunctionSequence(func() IteratorFunc {
-		iter, seqs := seq.Iterator(), sequences
-		var index int
+		iter, index := seq.Iterator(), 0
 		return func() (T, bool) {
 			for {
 				if iter == nil { // if we need a new iterator...
-					if index >= len(seqs) { // but there aren't any left...
+					if index >= len(sequences) { // but there aren't any left...
 						return nil, false // we're at the end
 					}
-					iter = seqs[index].Iterator() // otherwise, get the next iterator
+					iter = sequences[index].Iterator() // otherwise, get the next iterator
 					index++
 				}
 				if iter.Next() { // if the current iterator has an item, return true

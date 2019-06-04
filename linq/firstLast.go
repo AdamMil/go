@@ -26,7 +26,7 @@ func (s LINQ) First() T {
 	if item, ok := s.TryFirst(); ok {
 		return item
 	}
-	panic("First called on empty sequence (or no items match)")
+	panic(error(emptyError{}))
 }
 
 // Returns the first item in the sequence matching the given predicate, or panics if no items match.
@@ -81,7 +81,7 @@ func (s LINQ) Last() T {
 	if item, ok := s.TryLast(); ok {
 		return item
 	}
-	panic("Last called on empty sequence (or no items match)")
+	panic(error(emptyError{}))
 }
 
 // Returns the last item in the sequence matching the given predicate, or panics if no items match.
@@ -137,7 +137,7 @@ func (s LINQ) TryLastR(pred T) (T, bool) {
 	return s.WhereR(pred).TryLast()
 }
 
-// Returns the first item in the sequence, or panics if the sequence is empty or has multiple items.
+// Returns the first item in the sequence matching the given predicate, or panics if no items match or multiple items match.
 func (s LINQ) Single() T {
 	item, err := s.TrySingle()
 	if err != nil {
@@ -146,12 +146,12 @@ func (s LINQ) Single() T {
 	return item
 }
 
-// Returns the first item in the sequence matching the given predicate, or panics if the sequence is empty or has multiple items.
+// Returns the first item in the sequence matching the given predicate, or panics if no items match or multiple items match.
 func (s LINQ) SingleP(pred Predicate) T {
 	return s.Where(pred).Single()
 }
 
-// Returns the first item in the sequence matching the given predicate, or panics if the sequence is empty or has multiple items.
+// Returns the first item in the sequence matching the given predicate, or panics if no items match or multiple items match.
 // If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) SingleR(pred T) T {
 	return s.WhereR(pred).Single()
@@ -164,19 +164,19 @@ func (s LINQ) SingleOrNil() T {
 		if !i.Next() {
 			return v
 		}
-		panic(tooManyItemsError{})
+		panic(error(tooManyItemsError{}))
 	}
 	return nil
 }
 
-// Returns the first item in the sequence matching the given predicate, or returns nil if the sequence is empty, or panics if the
-// sequence has multiple items.
+// Returns the first item in the sequence matching the given predicate, or returns nil if no items match, or panics if
+// multiple items match.
 func (s LINQ) SingleOrNilP(pred Predicate) T {
 	return s.Where(pred).SingleOrNil()
 }
 
-// Returns the first item in the sequence matching the given predicate, or returns nil if the sequence is empty, or panics if the
-// sequence has multiple items. If the predicate is strongly typed, it will be called via reflection.
+// Returns the first item in the sequence matching the given predicate, or returns nil if no items match, or panics if
+// multiple items match. If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) SingleOrNilR(pred T) T {
 	return s.WhereR(pred).SingleOrNil()
 }
@@ -193,12 +193,12 @@ func (s LINQ) TrySingle() (T, error) {
 	return nil, emptyError{}
 }
 
-// Returns the first item in the sequence matching the given predicate or an error if the sequence is empty or has multiple items.
+// Returns the first item in the sequence matching the given predicate or an error if no items match or multiple items match.
 func (s LINQ) TrySingleP(pred Predicate) (T, error) {
 	return s.Where(pred).TrySingle()
 }
 
-// Returns the first item in the sequence matching the given predicate or an error if the sequence is empty or has multiple items.
+// Returns the first item in the sequence matching the given predicate or an error if no items match or multiple items match.
 // If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) TrySingleR(pred T) (T, error) {
 	return s.WhereR(pred).TrySingle()

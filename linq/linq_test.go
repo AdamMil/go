@@ -24,7 +24,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 	"unsafe"
 
 	. "bitbucket.org/adammil/go/collections"
@@ -70,15 +72,20 @@ func TestFunctions(t *testing.T) {
 	assertEqual(t, genericAggregatorFunc(nil), Aggregator(nil))
 	assertEqual(t, genericEqualFunc(nil), EqualFunc(nil))
 	assertEqual(t, genericLessThanFunc(nil), LessThanFunc(nil))
+	assertEqual(t, genericMerge1Func(nil), (func(T) (T, bool))(nil))
+	assertEqual(t, genericMerge2Func(nil), (func(T, T) (T, bool))(nil))
 	assertEqual(t, genericPairAction(nil), (func(T, T))(nil))
 	assertEqual(t, genericPairSelector(nil), (func(T, T) T)(nil))
 	assertEqual(t, genericPredicateFunc(nil), Predicate(nil))
 	assertEqual(t, genericSelectorFunc(nil), Selector(nil))
 	fa, fb, fc, fd, fe, ff := func(T) {}, func(T, T) T { return 0 }, func(T, T) bool { return true }, func(T, T) {}, func(T) T { return 0 }, func(T) bool { return true }
+	fm1, fm2 := func(T) (T, bool) { return nil, true }, func(T, T) (T, bool) { return nil, true }
 	assertEqual(t, genericActionFunc(fa), Action(fa))
 	assertEqual(t, genericAggregatorFunc(fb), Aggregator(fb))
 	assertEqual(t, genericEqualFunc(fc), EqualFunc(fc))
 	assertEqual(t, genericLessThanFunc(fc), LessThanFunc(fc))
+	assertEqual(t, genericMerge1Func(fm1), fm1)
+	assertEqual(t, genericMerge2Func(fm2), fm2)
 	assertEqual(t, genericPairAction(fd), fd)
 	assertEqual(t, genericPairSelector(fb), fb)
 	assertEqual(t, genericPredicateFunc(ff), Predicate(ff))
@@ -480,7 +487,28 @@ func TestLinqMaps(t *testing.T) {
 	m2 = Range(3).SelectR(func(i int) Pair { return Pair{kf(i), vf(i)} }).PairsToMap()
 	assertMapEqual(t, m2, 0, "0", 2, "0", 4, "1")
 	assertEqual(t, Empty.ToMapT(nil, nil), nil) // ToMapT on an empty sequence returns nil
+}
 
+func TestLinqMerge(t *testing.T) {
+	t.Parallel()
+	keepNegOdd := func(i int) (int, bool) {
+		if (i & 1) != 0 {
+			return -i, true
+		}
+		return 0, false
+	}
+
+	a, b := FromItems(1, 3, 5, 6, 7, 10), FromItems(2, 4, 5, 7, 9)
+	assertLinqEqual(t, a.MergeP(b, IntLessThanFunc, MergeKeep, nil, MergeKeepRight), 1, 3, 5, 6, 7, 10)
+	assertLinqEqual(t, a.MergeR(b, nil, keepNegOdd, MergeKeepLeft), 5, 7, -9)
+	assertLinqEqual(t, b.MergeR(a, nil, keepNegOdd, MergeKeepLeft), -1, -3, 5, 7)
+	assertLinqEqual(t,
+		a.MergePR(b, func(a, b int) bool { return a < b }, func(a int) (int, bool) { return -a, true }, func(b int) (int, bool) { return b * 2, true }, nil),
+		-1, 4, -3, 8, -6, 18, -10)
+	assertLinqEqual(t, b.Merge(a, MergeKeep, nil, genericMerge2Func(func(a, b int) (int, bool) { return a + b, true })),
+		2, 4, 10, 14, 9)
+	assertPanic(t, func() { a.MergeR(b, func(int) (T, int) { return nil, 0 }, nil, nil) }, "called with non-merger")
+	assertPanic(t, func() { a.MergeR(b, nil, nil, func(int, int) (T, int) { return nil, 0 }) }, "called with non-merger")
 }
 
 func TestLinqOrder(t *testing.T) {
@@ -524,6 +552,60 @@ func TestLinqOrder(t *testing.T) {
 	assertLinqEqual(t, Range(3).OrderByPR(func(i int) T { return -i }, func(a, b int) bool { return a < b }), 2, 1, 0)
 	assertLinqEqual(t, Range(3).OrderByDescendingP(func(i T) T { return -i.(int) }, func(a, b T) bool { return a.(int) < b.(int) }), 0, 1, 2)
 	assertLinqEqual(t, Range(3).OrderByDescendingPR(func(i int) T { return -i }, func(a, b int) bool { return a < b }), 0, 1, 2)
+}
+
+func TestLinqParallelism(t *testing.T) {
+	atoi := func(i int) string {
+		s := strconv.Itoa(i)
+		return strings.Repeat("0", 3-len(s)) + s
+	}
+	pan := func(i int) {
+		if i > 5 {
+			panic("oh no")
+		}
+	}
+	assertLinqEqual(t, Range(1000).ParallelSelectR(10, atoi).Order(), Range(1000).SelectR(atoi).ToSlice()...) // test > 8 cores
+	assertLinqEqual(t, Range(10).ParallelSelectR(1, atoi).Order(), Range(10).SelectR(atoi).ToSlice()...)      // one core is special cased
+	assertLinqEqual(t, Range(10).ParallelSelectR(0, atoi).Order(), Range(10).SelectR(atoi).ToSlice()...)      // test machine CPU count
+	assertPanic(t, func() { Range(100).ParallelSelectR(-1, atoi) }, "must be non-negative")
+	assertPanic(t, func() { Range(100).ParallelSelectR(4, func(i int) string { pan(i); return atoi(i) }).Count() }, "oh no")
+
+	// make an action that slowly processes an item
+	sum := int32(0)
+	fastProcess := func(i T) {
+		atomic.AddInt32(&sum, int32(i.(int)))
+	}
+	slowProcess := func(i int) {
+		timer := time.NewTimer(10 * time.Millisecond) // take 10ms to process the item
+		<-timer.C
+		timer.Stop() // stop the timer manually to clean up system resources since we are creating 1000 of them...
+		fastProcess(i)
+	}
+
+	// test with unlimited parallelism
+	startTime := time.Now()
+	Range(1000).ParallelForEachR(-1, slowProcess)
+	assertEqual(t, sum, int32(499500))
+	assertTrue(t, time.Now().Sub(startTime) < 300*time.Millisecond, "ParallelForEach(-1) took too long")
+
+	// test with limited parallelism
+	sum, startTime = 0, time.Now()
+	Range(100).ParallelForEachR(10, slowProcess)
+	assertEqual(t, sum, int32(4950))
+	assertTrue(t, time.Now().Sub(startTime) < 300*time.Millisecond, "ParallelForEach(10) took too long")
+
+	// test reclamation of goroutines
+	sum = 0
+	Range(1000).ParallelForEach(-1, fastProcess)
+	assertEqual(t, sum, int32(499500))
+
+	// test default threadiness
+	sum = 0
+	Range(10).ParallelForEach(0, fastProcess)
+	assertEqual(t, sum, int32(45))
+
+	// test propagation of panics
+	assertPanic(t, func() { Range(10).ParallelForEachR(-1, pan) }, "oh no")
 }
 
 func TestLinqRegister(t *testing.T) {

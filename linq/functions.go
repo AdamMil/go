@@ -142,6 +142,42 @@ func genericLessThanFunc(f T) LessThanFunc { // see above for comments
 	}
 }
 
+func genericMerge1Func(f T) func(T) (T, bool) { // see above for comments
+	if f == nil {
+		return nil
+	} else if p, ok := f.(func(T) (T, bool)); ok {
+		return p
+	}
+
+	t := reflect.TypeOf(f)
+	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf(false) {
+		panic(fmt.Sprintf("called with non-merger %v", f))
+	}
+	v := reflect.ValueOf(f)
+	return func(a T) (T, bool) {
+		result := v.Call([]reflect.Value{reflect.ValueOf(a)})
+		return result[0].Interface(), result[1].Interface().(bool)
+	}
+}
+
+func genericMerge2Func(f T) func(T, T) (T, bool) { // see above for comments
+	if f == nil {
+		return nil
+	} else if p, ok := f.(func(T, T) (T, bool)); ok {
+		return p
+	}
+
+	t := reflect.TypeOf(f)
+	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf(false) {
+		panic(fmt.Sprintf("called with non-merger %v", f))
+	}
+	v := reflect.ValueOf(f)
+	return func(a, b T) (T, bool) {
+		result := v.Call([]reflect.Value{reflect.ValueOf(a), reflect.ValueOf(b)})
+		return result[0].Interface(), result[1].Interface().(bool)
+	}
+}
+
 func genericPairAction(f T) func(T, T) { // see above for comments
 	if f == nil {
 		return nil

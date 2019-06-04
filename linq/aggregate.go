@@ -26,6 +26,15 @@ import (
 	. "bitbucket.org/adammil/go/collections"
 )
 
+// MergeKeep can be passed to Merge to keep a value when it exists on only one side.
+var MergeKeep = func(v T) (T, bool) { return v, true }
+
+// KeepLeft can be passed to Merge to keep the left-side value when it exists on both sides.
+var MergeKeepLeft = func(a T, b T) (T, bool) { return a, true }
+
+// KeepRight can be passed to Merge to keep the right-side value when it exists on both sides.
+var MergeKeepRight = func(a T, b T) (T, bool) { return b, true }
+
 // Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
 // are passed to the function, and so on. The final return value from the function is returned. However, if the sequence contains only
 // a single item, that item is returned, and if the sequence is empty, the function panics.
@@ -33,7 +42,7 @@ func (s LINQ) Aggregate(agg Aggregator) T {
 	if item, ok := s.TryAggregate(agg); ok {
 		return item
 	}
-	panic(emptyError{})
+	panic(error(emptyError{}))
 }
 
 // Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
@@ -169,6 +178,87 @@ func (s LINQ) TryMaxR(cmp T) (T, bool) {
 	return s.TryMaxP(genericLessThanFunc(cmp))
 }
 
+// Merges the sequence (considered to be the "left" sequence) with another sequence (considered to be the "right" sequence). Both
+// sequences must be sorted. Items that exist only in the left or right sequence will be passed to the leftOnly or rightOnly function
+// respectively, and items that exist in both sequences will be passed to the both function. If the function returns a value and true,
+// the returned value will be included in the resulting sequence. If the function returns false or if the function is nil, no item
+// will be added to the returned sequence. Items are compared using the default comparison function.
+func (s LINQ) Merge(rs Sequence, leftOnly func(T) (T, bool), rightOnly func(T) (T, bool), both func(T, T) (T, bool)) LINQ {
+	return s.MergeP(rs, nil, leftOnly, rightOnly, both)
+}
+
+// Merges the sequence (considered to be the "left" sequence) with another sequence (considered to be the "right" sequence). Both
+// sequences must be sorted. Items that exist only in the left or right sequence will be passed to the leftOnly or rightOnly function
+// respectively, and items that exist in both sequences will be passed to the both function. If the function returns a value and true,
+// the returned value will be included in the resulting sequence. If the function returns false or if the function is nil, no item
+// will be added to the returned sequence. Items are compared using the given comparison function.
+func (s LINQ) MergeP(rs Sequence, cmp LessThanFunc, leftOnly func(T) (T, bool), rightOnly func(T) (T, bool), both func(T, T) (T, bool)) LINQ {
+	if cmp == nil {
+		cmp = GenericLessThan
+	}
+	return FromSequenceFunction(func() IteratorFunc {
+		li, ri := s.Iterator(), rs.Iterator()
+		ln, rn := li.Next(), ri.Next()
+		return func() (T, bool) {
+			for {
+				var nv T
+				var keep bool
+				if ln && rn { // if we have values from both sides...
+					lv, rv := li.Current(), ri.Current()
+					if cmp(lv, rv) { // if lv < rv then consume the value from the left side
+						ln = li.Next()
+						if leftOnly != nil {
+							nv, keep = leftOnly(lv)
+						}
+					} else if cmp(rv, lv) { // else if lv > rv, consume the value from the right side
+						rn = ri.Next()
+						if rightOnly != nil {
+							nv, keep = rightOnly(rv)
+						}
+					} else { // else if lv == rv, consume both values
+						ln, rn = li.Next(), ri.Next()
+						if both != nil {
+							nv, keep = both(lv, rv)
+						}
+					}
+				} else if ln && leftOnly != nil { // if we only have a value from the left side, consume it
+					nv, keep = leftOnly(li.Current())
+					ln = li.Next()
+				} else if rn && rightOnly != nil { // or only from the right side...
+					nv, keep = rightOnly(ri.Current())
+					rn = ri.Next()
+				} else { // we have no values (or no functions to receive the values)
+					return nil, false
+				}
+
+				if keep { // if the new value should be included in the sequence...
+					return nv, true // return it
+				} // otherwise, loop around to the next value
+			}
+		}
+	})
+}
+
+// Merges the sequence (considered to be the "left" sequence) with another sequence (considered to be the "right" sequence). Both
+// sequences must be sorted. Items that exist only in the left or right sequence will be passed to the leftOnly or rightOnly function
+// respectively, and items that exist in both sequences will be passed to the both function. If the function returns a value and true,
+// the returned value will be included in the resulting sequence. If the function returns false or if the function is nil, no item
+// will be added to the returned sequence. Items are compared using the given comparison function.
+// If any function is strongly typed, it will be called via reflection.
+func (s LINQ) MergePR(rs Sequence, cmp T, leftOnly T, rightOnly T, both T) LINQ {
+	return s.MergeP(rs, genericLessThanFunc(cmp), genericMerge1Func(leftOnly), genericMerge1Func(rightOnly), genericMerge2Func(both))
+}
+
+// Merges the sequence (considered to be the "left" sequence) with another sequence (considered to be the "right" sequence). Both
+// sequences must be sorted. Items that exist only in the left or right sequence will be passed to the leftOnly or rightOnly function
+// respectively, and items that exist in both sequences will be passed to the both function. If the function returns a value and true,
+// the returned value will be included in the resulting sequence. If the function returns false or if the function is nil, no item
+// will be added to the returned sequence. Items are compared using the default comparison function.
+// If any function is strongly typed, it will be called via reflection.
+func (s LINQ) MergeR(rs Sequence, leftOnly T, rightOnly T, both T) LINQ {
+	return s.MergePR(rs, nil, leftOnly, rightOnly, both)
+}
+
 // Returns the item from the sequence with the least value according to the default comparison function, or if the sequence is
 // empty the function panics.
 func (s LINQ) Min() T {
@@ -264,8 +354,7 @@ func (s LINQ) TrySum() (T, bool) {
 // and is the length of the shortest input sequence.
 func Zip(agg func([]T) T, seqs ...Sequence) LINQ {
 	return FromSequenceFunction(func() IteratorFunc {
-		params := make([]T, len(seqs))
-		iters := make([]Iterator, len(seqs))
+		params, iters := make([]T, len(seqs)), make([]Iterator, len(seqs))
 		for i := 0; i < len(iters); i++ {
 			iters[i] = seqs[i].Iterator()
 		}

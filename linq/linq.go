@@ -88,7 +88,7 @@ func (s LINQ) AnyR(pred T) bool {
 	return s.WhereR(pred).Any()
 }
 
-// Caches the items from the sequence the first item it's iterated, to avoid excess work on repeated iterations. This method is also
+// Caches the items from the sequence the first time it's iterated, to avoid excess work on repeated iterations. This method is also
 // useful to allow a sequence created from an IteratorFunc (via MakeOneTimeFunctionSequence or FromIteratorFunction) to be iterated
 // more than once.
 func (s LINQ) Cache() LINQ {

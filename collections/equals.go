@@ -24,7 +24,7 @@ import "reflect"
 
 // Returns a function designed to check whether an item in a sequence matches the given item. The comparison is inherently one-sided
 // and is not identical to using GenericEqual, in that a nil item will match zero pointers of all types, but zero pointers will not
-//match nil. This allows doing s.Contains(nil) to check if a sequence of pointers contains a nil pointer.
+// match nil. This allows doing s.Contains(nil) to check if a sequence of pointers contains a nil pointer.
 func MakeContainsComparer(item T) func(T) bool {
 	cmp := makeContainsComparer(item)
 	return (&cmp).Equal
@@ -41,8 +41,8 @@ func GenericEqual(a, b T) bool {
 		return true
 	} else if !isEquatable(ta.Kind()) { // if the values can't generally be compared with ==...
 		return reflect.ValueOf(a).Pointer() == reflect.ValueOf(b).Pointer() // compare the pointers
-	} else if ta != pairType || tb != pairType { // otherwise, if if the kinds can be compared via ==
-		return a == b // do so. this can fail if the items are structs with incomparable field values. oh well.
+	} else if ta != pairType { // otherwise, if if the kinds can be compared via ==
+		return a == b // do so. this can panic if the items are structs with incomparable field values. oh well.
 	} else { // we special-case Pair so we can compare Pairs with normally incomparable field values
 		pa, pb := a.(Pair), b.(Pair)
 		return GenericEqual(pa.Key, pb.Key) && GenericEqual(pa.Value, pb.Value)
@@ -96,7 +96,7 @@ func (cmp *containsComparer) Equal(elem T) bool {
 	} else if !cmp.isEquatable { // if the items can't be compared with ==, compare the pointers
 		return reflect.ValueOf(elem).Pointer() == cmp.itemPtr // this handles slices, maps, functions, and comparisons of pointers against nil
 	} else if !cmp.isPair || t != pairType { // if the objects can normally be compared with == and we're not comparing Pair objects...
-		return elem == cmp.item // this can fail if the items are structs with incomparable field values. oh well.
+		return elem == cmp.item // this can panic if the items are structs with incomparable field values. oh well.
 	} else { // special-case Pair because they're so common here and we don't want to fail on Pairs with incomparable field values
 		p := elem.(Pair)
 		return GenericEqual(cmp.item, p.Key) && GenericEqual(cmp.value, p.Value)

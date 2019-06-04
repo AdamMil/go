@@ -30,8 +30,7 @@ func (s LINQ) Skip(n int) LINQ {
 		panic("argument must be non-negative")
 	}
 	return FromSequenceFunction(func() IteratorFunc {
-		i := s.Iterator()
-		var skipped bool
+		i, skipped := s.Iterator(), false
 		return func() (T, bool) {
 			if !skipped {
 				for count := 0; count < n && i.Next(); count++ {
