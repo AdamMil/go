@@ -20,6 +20,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Package linq provides .NET-like LINQ queries for Go.
 package linq
 
+// TODO: make Range and Repeat sequences implement Collection so as to get Count() optimizations?
+
 import (
 	"fmt"
 
@@ -409,6 +411,20 @@ func Range2(start, count int) LINQ {
 				i := start + n
 				n++
 				return i, true
+			}
+			return nil, false
+		}
+	})
+}
+
+// Returns the given item repeated the given number of times.
+func Repeat(item T, count int) LINQ {
+	return FromSequenceFunction(func() IteratorFunc {
+		n := count
+		return func() (T, bool) {
+			if n > 0 {
+				n--
+				return item, true
 			}
 			return nil, false
 		}

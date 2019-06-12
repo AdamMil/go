@@ -42,6 +42,10 @@ func TestFunctions(t *testing.T) {
 	assertSlicesEqual(t, ToSlice(Range(5)), 0, 1, 2, 3, 4)
 	assertLinqEqual(t, FromItems(1, 2, 3), 1, 2, 3)
 
+	assertLinqEqual(t, Repeat("hi", 0))
+	assertLinqEqual(t, Repeat("hi", 1), "hi")
+	assertLinqEqual(t, Repeat(7, 5), 7, 7, 7, 7, 7)
+
 	s, err := ToSequence([]T{1, 2})
 	assertEqual(t, err, nil)
 	ns, err := ToSequence(s) // test that a passed sequence is returned unchanged
@@ -557,18 +561,13 @@ func TestLinqOrder(t *testing.T) {
 func TestLinqParallelism(t *testing.T) {
 	atoi := func(i int) string {
 		s := strconv.Itoa(i)
-		return strings.Repeat("0", 3-len(s)) + s
+		return strings.Repeat("0", 3-len(s)) + s // pad with zeros so .Order() will sort the strings the same as the integers
 	}
 	pan := func(i int) {
 		if i > 5 {
 			panic("oh no")
 		}
 	}
-	assertLinqEqual(t, Range(1000).ParallelSelectR(10, atoi).Order(), Range(1000).SelectR(atoi).ToSlice()...) // test > 8 cores
-	assertLinqEqual(t, Range(10).ParallelSelectR(1, atoi).Order(), Range(10).SelectR(atoi).ToSlice()...)      // one core is special cased
-	assertLinqEqual(t, Range(10).ParallelSelectR(0, atoi).Order(), Range(10).SelectR(atoi).ToSlice()...)      // test machine CPU count
-	assertPanic(t, func() { Range(100).ParallelSelectR(-1, atoi) }, "must be non-negative")
-	assertPanic(t, func() { Range(100).ParallelSelectR(4, func(i int) string { pan(i); return atoi(i) }).Count() }, "oh no")
 
 	// make an action that slowly processes an item
 	sum := int32(0)
@@ -578,12 +577,24 @@ func TestLinqParallelism(t *testing.T) {
 	slowProcess := func(i int) {
 		timer := time.NewTimer(10 * time.Millisecond) // take 10ms to process the item
 		<-timer.C
-		timer.Stop() // stop the timer manually to clean up system resources since we are creating 1000 of them...
+		timer.Stop() // stop the timer manually to clean up system resources since we /are/ creating thousands of them...
 		fastProcess(i)
 	}
 
+	/* test ParallelSelect */
+	assertLinqEqual(t, Range(100).ParallelSelectR(10, atoi).Order().Cache(), Range(100).SelectR(atoi).ToSlice()...) // test > 8 cores
+	assertLinqEqual(t, Range(10).ParallelSelectR(1, atoi).Order().Cache(), Range(10).SelectR(atoi).ToSlice()...)    // one core is special cased
+	assertLinqEqual(t, Range(10).ParallelSelectR(0, atoi).Order().Cache(), Range(10).SelectR(atoi).ToSlice()...)    // test machine CPU count
+	assertPanic(t, func() { Range(100).ParallelSelectR(-1, atoi) }, "must be non-negative")
+	assertPanic(t, func() { Range(100).ParallelSelectR(4, func(i int) string { pan(i); return atoi(i) }).Count() }, "oh no")
+	startTime := time.Now() // also test the timing to make sure we're gaining parallelism
+	Range(100).ParallelSelectR(10, func(i int) T { slowProcess(i); return nil }).Count()
+	assertEqual(t, sum, int32(4950))
+	assertTrue(t, time.Now().Sub(startTime) < 300*time.Millisecond, "ParallelSelect(10) took too long")
+
+	/* test ParallelForEach */
 	// test with unlimited parallelism
-	startTime := time.Now()
+	sum, startTime = 0, time.Now()
 	Range(1000).ParallelForEachR(-1, slowProcess)
 	assertEqual(t, sum, int32(499500))
 	assertTrue(t, time.Now().Sub(startTime) < 300*time.Millisecond, "ParallelForEach(-1) took too long")
@@ -602,6 +613,11 @@ func TestLinqParallelism(t *testing.T) {
 	// test default threadiness
 	sum = 0
 	Range(10).ParallelForEach(0, fastProcess)
+	assertEqual(t, sum, int32(45))
+
+	// test single-core optimization
+	sum = 0
+	Range(10).ParallelForEach(1, fastProcess)
 	assertEqual(t, sum, int32(45))
 
 	// test propagation of panics

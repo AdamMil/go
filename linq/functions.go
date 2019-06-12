@@ -73,6 +73,16 @@ func PairSelector(f func(Pair) T) Selector {
 	return func(i T) T { return f(i.(Pair)) }
 }
 
+// Given an item that is a Pair, returns the pair's Key.
+func SelectPairKey(item T) T {
+	return item.(Pair).Key
+}
+
+// Given an item that is a Pair, returns the pair's Value.
+func SelectPairValue(item T) T {
+	return item.(Pair).Value
+}
+
 func genericActionFunc(f T) Action {
 	if f == nil { // if the function pointer is nil...
 		return nil // return a nil Action
