@@ -59,6 +59,8 @@ func GenericLessThan(a, b T) bool {
 		return uintLessThan(uint64(a.(uint32)), b)
 	case reflect.Uint64:
 		return uintLessThan(a.(uint64), b)
+	case reflect.Uintptr:
+		return uintLessThan(uint64(a.(uintptr)), b)
 	case reflect.Float32:
 		return floatLessThan(float64(a.(float32)), b)
 	case reflect.Float64:
@@ -73,14 +75,12 @@ func GenericLessThan(a, b T) bool {
 		} else {
 			return reflect.String < reflect.TypeOf(b).Kind()
 		}
-	case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func, reflect.Uintptr, reflect.UnsafePointer:
+	case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func, reflect.UnsafePointer:
 		kb := reflect.TypeOf(b).Kind()
 		if ka != kb {
 			return ka < kb
-		} else if ka != reflect.Uintptr {
-			return reflect.ValueOf(a).Pointer() < reflect.ValueOf(b).Pointer()
 		} else {
-			return a.(uintptr) < b.(uintptr)
+			return reflect.ValueOf(a).Pointer() < reflect.ValueOf(b).Pointer()
 		}
 	default:
 		kb := reflect.TypeOf(b).Kind()
@@ -101,27 +101,48 @@ func boolLessThan(a bool, b T) bool {
 }
 
 func complexLessThan(a complex128, b T) bool {
-	if bc, ok := b.(complex128); ok {
-		av, bv := real(a), real(bc)
-		if av < bv {
-			return true
-		} else if av > bv {
-			return false
-		} else {
-			return imag(a) < imag(bc)
-		}
-	} else if bc, ok := b.(complex64); ok {
+	var br float64
+	bk := reflect.TypeOf(b).Kind()
+	switch bk {
+	case reflect.Int:
+		br = float64(b.(int))
+	case reflect.Int8:
+		br = float64(b.(int8))
+	case reflect.Int16:
+		br = float64(b.(int16))
+	case reflect.Int32:
+		br = float64(b.(int32))
+	case reflect.Int64:
+		br = float64(b.(int64))
+	case reflect.Uint:
+		br = float64(b.(uint))
+	case reflect.Uint8:
+		br = float64(b.(uint8))
+	case reflect.Uint16:
+		br = float64(b.(uint16))
+	case reflect.Uint32:
+		br = float64(b.(uint32))
+	case reflect.Uint64:
+		br = float64(b.(uint64))
+	case reflect.Uintptr:
+		br = float64(b.(uintptr))
+	case reflect.Float32:
+		br = float64(b.(float32))
+	case reflect.Float64:
+		br = b.(float64)
+	case reflect.Complex64:
+		bc := b.(complex64)
 		av, bv := real(a), float64(real(bc))
-		if av < bv {
-			return true
-		} else if av > bv {
-			return false
-		} else {
-			return imag(a) < float64(imag(bc))
-		}
-	} else {
-		return reflect.Complex128 < reflect.TypeOf(b).Kind()
+		return av < bv || av == bv && imag(a) < float64(imag(bc))
+	case reflect.Complex128:
+		bc := b.(complex128)
+		av, bv := real(a), real(bc)
+		return av < bv || av == bv && imag(a) < imag(bc)
+	default:
+		return reflect.Complex128 < bk // we don't need the real type of 'a' since all numerics are adjacent in the enum
 	}
+	ar := real(a)
+	return ar < br || ar == br && imag(a) < 0
 }
 
 func floatLessThan(a float64, b T) bool {
@@ -147,10 +168,20 @@ func floatLessThan(a float64, b T) bool {
 		return a < float64(b.(uint32))
 	case reflect.Uint64:
 		return a < float64(b.(uint64))
+	case reflect.Uintptr:
+		return a < float64(b.(uintptr))
 	case reflect.Float32:
 		return a < float64(b.(float32))
 	case reflect.Float64:
 		return a < b.(float64)
+	case reflect.Complex64:
+		bc := b.(complex64)
+		br := float64(real(bc))
+		return a < br || a == br && imag(bc) > 0
+	case reflect.Complex128:
+		bc := b.(complex128)
+		br := real(bc)
+		return a < br || a == br && imag(bc) > 0
 	default:
 		return reflect.Float64 < bk // we don't need the real type of 'a' since all numerics are adjacent in the enum
 	}
@@ -179,10 +210,20 @@ func intLessThan(a int64, b T) bool {
 		return a < 0 || uint64(a) < uint64(b.(uint32))
 	case reflect.Uint64:
 		return a < 0 || uint64(a) < b.(uint64)
+	case reflect.Uintptr:
+		return a < 0 || uint64(a) < uint64(b.(uintptr))
 	case reflect.Float32:
 		return float32(a) < b.(float32)
 	case reflect.Float64:
 		return float64(a) < b.(float64)
+	case reflect.Complex64:
+		bc := b.(complex64)
+		ar, br := float64(a), float64(real(bc))
+		return ar < br || ar == br && imag(bc) > 0
+	case reflect.Complex128:
+		bc := b.(complex128)
+		ar, br := float64(a), real(bc)
+		return ar < br || ar == br && imag(bc) > 0
 	default:
 		return reflect.Int < bk // we don't need the real type of 'a' since all numerics are adjacent in the enum
 	}
@@ -215,11 +256,21 @@ func uintLessThan(a uint64, b T) bool {
 	case reflect.Uint32:
 		return a < uint64(b.(uint32))
 	case reflect.Uint64:
-		return a < uint64(b.(uint64))
+		return a < b.(uint64)
+	case reflect.Uintptr:
+		return a < uint64(b.(uintptr))
 	case reflect.Float32:
 		return float32(a) < b.(float32)
 	case reflect.Float64:
 		return float64(a) < b.(float64)
+	case reflect.Complex64:
+		bc := b.(complex64)
+		ar, br := float64(a), float64(real(bc))
+		return ar < br || ar == br && imag(bc) > 0
+	case reflect.Complex128:
+		bc := b.(complex128)
+		ar, br := float64(a), real(bc)
+		return ar < br || ar == br && imag(bc) > 0
 	default:
 		return reflect.Uint < bk // we don't need the real type of 'a' since all numerics are adjacent in the enum
 	}

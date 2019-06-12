@@ -49,27 +49,39 @@ type Collection interface {
 	Count() int
 }
 
-// A Dictionary represents a map from keys to values. It is also a Sequence of Pair object.
-type Dictionary interface {
+// A ReadOnlyDictionary represents a map from keys to values. It is also a Sequence of Pair objects.
+type ReadOnlyDictionary interface {
 	Collection
 	// Indicates whether the collection contains a given key. The Contains(T) function from the Collection interface determines
 	// whether the dictionary contains a given Pair, not a given key.
 	ContainsKey(T) bool
 	// Gets a value from the dictionary given its key, and panics if the item does not exist.
 	Get(key T) T
-	// Sets a value in the dictionary given its key, overwriting any existing value.
-	Set(key, value T)
-	// Removes a value from the dictionary given its key.
-	Remove(key T)
 	// Attempts to get a value from the dictionary given its key.
 	TryGet(key T) (T, bool)
 }
 
-// A List represents a Collection whose items can be easily accessed in any order.
-type List interface {
+// A Dictionary represents a map from keys to values that can be altered. It is also a Sequence of Pair objects.
+type Dictionary interface {
+	ReadOnlyDictionary
+	// Sets a value in the dictionary given its key, overwriting any existing value.
+	Set(key, value T)
+	// Removes a value from the dictionary given its key.
+	Remove(key T)
+}
+
+// A ReadOnlyList represents a Collection whose items can be easily accessed in any order.
+type ReadOnlyList interface {
 	Collection
+	// Gets the index of the given item, or -1 if the item doesn't exist.
+	IndexOf(item T) int
 	// Gets the item at a given index, and panics if the index is out of range.
 	Get(index int) T
+}
+
+// A List represents a Collection whose items can be easily accessed in any order and can be altered.
+type List interface {
+	ReadOnlyList
 	// Sets the item at a given index, and panics if the index is out of range.
 	Set(index int, item T)
 }
@@ -77,4 +89,15 @@ type List interface {
 // A Pair represents a key and value. Dictionaries, as well as Sequences based on maps, are sequences of Pairs.
 type Pair struct {
 	Key, Value T
+}
+
+// A Queue represents an ordered sequence of items, where the order is determined by the specific type of queue.
+type Queue interface {
+	Collection
+	// Adds an item to the queue.
+	Enqueue(item T)
+	// Removes an item from the queue.
+	Dequeue() T
+	// Returns an item from the queue without removing it.
+	Peek() T
 }

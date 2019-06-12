@@ -75,20 +75,24 @@ func (i *$IT) Next() bool {
 	}
 	return false
 }
+
+func (s $ST) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
 EOF
 
 if [[ "$T" != "T" ]]; then
 	cat <<EOF >>$FN
 
-func (s $ST) Contains(item T) bool {
+func (s $ST) IndexOf(item T) int {
 	if v, ok := item.($T); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func ${N}EqualFunc(a, b T) bool {
@@ -98,14 +102,26 @@ EOF
 else
 	cat <<EOF >>$FN
 
-func (s $ST) Contains(item T) bool {
-	cmp := MakeContainsComparer(item)
-	for i := 0; i < len(s); i++ {
-		if cmp(s[i]) {
-			return true
+func (s $ST) IndexOf(item T) int {
+	cmp := makeContainsComparer(item)
+	for i, v := range s {
+		if cmp.Equal(v) {
+			return i
 		}
 	}
-	return false
+	return -1
+}
+
+func (s $ST) Len() int {
+	return len(s)
+}
+
+func (s $ST) Less(ai, bi int) bool {
+	return GenericLessThan(s[ai], s[bi])
+}
+
+func (s $ST) Swap(ai, bi int) {
+	s[ai], s[bi] = s[bi], s[ai]
 }
 EOF
 fi

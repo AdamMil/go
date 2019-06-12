@@ -68,14 +68,18 @@ func (i *int32Iterator) Next() bool {
 }
 
 func (s Int32Sequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s Int32Sequence) IndexOf(item T) int {
 	if v, ok := item.(int32); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func Int32EqualFunc(a, b T) bool {

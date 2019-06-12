@@ -68,11 +68,27 @@ func (i *tIterator) Next() bool {
 }
 
 func (s TSequence) Contains(item T) bool {
-	cmp := MakeContainsComparer(item)
-	for i := 0; i < len(s); i++ {
-		if cmp(s[i]) {
-			return true
+	return s.IndexOf(item) >= 0
+}
+
+func (s TSequence) IndexOf(item T) int {
+	cmp := makeContainsComparer(item)
+	for i, v := range s {
+		if cmp.Equal(v) {
+			return i
 		}
 	}
-	return false
+	return -1
+}
+
+func (s TSequence) Len() int {
+	return len(s)
+}
+
+func (s TSequence) Less(ai, bi int) bool {
+	return GenericLessThan(s[ai], s[bi])
+}
+
+func (s TSequence) Swap(ai, bi int) {
+	s[ai], s[bi] = s[bi], s[ai]
 }

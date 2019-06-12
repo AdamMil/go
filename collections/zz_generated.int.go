@@ -68,14 +68,18 @@ func (i *intIterator) Next() bool {
 }
 
 func (s IntSequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s IntSequence) IndexOf(item T) int {
 	if v, ok := item.(int); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func IntEqualFunc(a, b T) bool {

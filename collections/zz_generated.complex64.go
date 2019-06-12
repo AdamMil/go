@@ -68,14 +68,18 @@ func (i *complex64Iterator) Next() bool {
 }
 
 func (s Complex64Sequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s Complex64Sequence) IndexOf(item T) int {
 	if v, ok := item.(complex64); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func Complex64EqualFunc(a, b T) bool {

@@ -36,9 +36,11 @@ type SequenceFunc func() IteratorFunc
 
 var sequenceCreators = make(map[reflect.Type]func(T) (Sequence, error))
 var tType = reflect.TypeOf([]T{}).Elem() // typeof(T)
+var itfType = reflect.TypeOf(IteratorFunc(nil))
+var seqfType = reflect.TypeOf(SequenceFunc(nil))
 
 // Appends the elements from the sequence to a slice. The updated slice is returned.
-func AddToSlice(seq Sequence, slice T) T {
+func AddToSlice(slice T, seq Sequence) T {
 	extra := -1
 	if col, ok := seq.(Collection); ok {
 		extra = col.Count()
@@ -57,7 +59,7 @@ func AddToSlice(seq Sequence, slice T) T {
 	} else { // otherwise, use reflection
 		rs := reflect.ValueOf(slice)
 		if rs.Kind() != reflect.Slice {
-			panic("argument is not a slice")
+			panic(fmt.Errorf("argument is of type %T, not a slice", slice))
 		}
 		if extra >= 0 && rs.Len()+extra > rs.Cap() { // if we know the final length, grow the slice ahead of time
 			na := reflect.MakeSlice(rs.Type(), rs.Len(), rs.Len()+extra)
@@ -97,24 +99,80 @@ func RegisterSequenceCreator(t reflect.Type, creator func(T) (Sequence, error)) 
 	sequenceCreators[t] = creator
 }
 
-// Attempts to convert an object to a Sequence using the following rules: If the object is a LINQ or Sequence, it is returned as-is.
-// Otherwise, if a sequence creator for the object type has been registered via RegisterSequenceCreator, it is invoked to create the
-// sequence. Otherwise, if the object is an array, slice, map, channel, or string, a generic sequence is created to iterate through
-// the object. (Slices and arrays become Lists, maps become Dictionaries, channels become Sequences that can be iterated only once,
-// and strings iterate their runes.) Otherwise, if the object is a
-func ToSequence(obj T) (Sequence, error) {
-	if seq, ok := obj.(Sequence); ok {
-		return seq, nil
-	}
-
-	t := reflect.TypeOf(obj)
+// Attempts to convert an object to a Dictionary using the following rules: If a sequence creator for the object type has been
+// registered via RegisterSequenceCreator, it is invoked to create a sequence, and if the sequence is a Dictionary, it is returned.
+// Otherwise (or if the sequence creator fails), if the object is a Dictionary, it is returned as-is. Otherwise, if the object is a
+// map, a generic reflection-based Dictionary is created for the object. If the object is nil, a nil Dictionary is returned.
+func ToDictionary(obj T) (Dictionary, error) {
 	var err error
+	t := reflect.TypeOf(obj)
+	if t != nil {
+		if creator, ok := sequenceCreators[t]; ok {
+			seq, err := creator(obj)
+			if dict, ok := seq.(Dictionary); ok && err == nil {
+				return dict, nil
+			} // give the generic logic a chance if the sequence creator returned an error
+		}
+
+		if dict, ok := obj.(Dictionary); ok {
+			return dict, nil
+		} else if t.Kind() == reflect.Map {
+			return genericMapSequence{reflect.ValueOf(obj)}, nil
+		} else if err == nil { // if we don't have an error from a sequence creator, use a generic error
+			err = fmt.Errorf("Invalid dictionary type: %v", t)
+		}
+	}
+	return nil, err
+}
+
+// Attempts to convert an object to a List using the following rules: If a sequence creator for the object type has been registered via
+// RegisterSequenceCreator, it is invoked to create a sequence, and if the sequence is a List, it is returned. Otherwise (or if the
+// sequence creator fails), if the object is a List, it is returned as-is. Otherwise, if the object is an array or slice, a generic
+// reflection-based List is created for the object. If the object is nil, a nil List is returned.
+func ToList(obj T) (List, error) {
+	var err error
+	t := reflect.TypeOf(obj)
+	if t != nil {
+		if creator, ok := sequenceCreators[t]; ok {
+			seq, err := creator(obj)
+			if list, ok := seq.(List); ok && err == nil {
+				return list, nil
+			} // give the generic logic a chance if the sequence creator returned an error
+		}
+
+		if list, ok := obj.(List); ok {
+			return list, nil
+		}
+
+		kind := t.Kind()
+		if kind == reflect.Slice || kind == reflect.Array {
+			return genericArraySequence{reflect.ValueOf(obj)}, nil
+		} else if err == nil { // if we don't have an error from a sequence creator, use a generic error
+			err = fmt.Errorf("Invalid list type: %v", t)
+		}
+	}
+	return nil, err
+}
+
+// Attempts to convert an object to a Sequence using the following rules: If a sequence creator for the object type has been registered
+// via RegisterSequenceCreator, it is invoked to create the sequence. Otherwise (or if the sequence creator fails), if the object is a
+// Sequence, it is returned as-is. Otherwise, if the object is an array, slice, map, channel, or string, a generic sequence is created
+// to iterate through the object. (Slices and arrays become Lists, maps become Dictionaries, channels become Sequences that can be
+// iterated only once, and strings iterate their runes.) Otherwise, if the object is an SequenceFunc or an IteratorFunc it is used to
+// construct a function-based sequence. If the object is nil, a nil Sequence is returned.
+func ToSequence(obj T) (Sequence, error) {
+	var err error
+	t := reflect.TypeOf(obj)
 	if t != nil {
 		if creator, ok := sequenceCreators[t]; ok {
 			seq, err := creator(obj)
 			if err == nil {
 				return seq, nil
-			} // give the generic logic a chance of the sequence creator failed
+			} // give the generic logic a chance if the sequence creator returned an error
+		}
+
+		if seq, ok := obj.(Sequence); ok {
+			return seq, nil
 		}
 
 		kind := t.Kind()
@@ -127,16 +185,24 @@ func ToSequence(obj T) (Sequence, error) {
 		} else if kind == reflect.String {
 			return stringSequence(obj.(string)), nil
 		} else if kind == reflect.Func {
-			if f, ok := obj.(func() IteratorFunc); ok { // catch all functions with the right signature, not only SequenceFunc objects
+			if f, ok := obj.(func() IteratorFunc); ok { // catch all functions with the right signature, not only SequenceFunc or IteratorFunc
 				return MakeFunctionSequence(f), nil
-			} else if g, ok := obj.(func() (T, bool)); ok {
-				return MakeOneTimeFunctionSequence(g), nil
+			} else if g, ok := obj.(SequenceFunc); ok {
+				return MakeFunctionSequence(g), nil
+			} else if h, ok := obj.(func() (T, bool)); ok {
+				return MakeOneTimeFunctionSequence(h), nil
+			} else if i, ok := obj.(IteratorFunc); ok {
+				return MakeOneTimeFunctionSequence(i), nil
+			} else if t.ConvertibleTo(seqfType) {
+				return MakeFunctionSequence(reflect.ValueOf(obj).Convert(seqfType).Interface().(SequenceFunc)), nil
+			} else if t.ConvertibleTo(itfType) {
+				return MakeOneTimeFunctionSequence(reflect.ValueOf(obj).Convert(itfType).Interface().(IteratorFunc)), nil
 			}
 		}
-	}
 
-	if err == nil { // if we don't have an error from a sequence creator, use a generic error
-		err = fmt.Errorf("Invalid sequence type: %v", t)
+		if err == nil { // if we don't have an error from a sequence creator, use a generic error
+			err = fmt.Errorf("Invalid sequence type: %v", t)
+		}
 	}
 	return nil, err
 }
@@ -243,13 +309,17 @@ func (s genericArraySequence) Iterator() Iterator {
 }
 
 func (s genericArraySequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s genericArraySequence) IndexOf(item T) int {
 	cmp := makeContainsComparer(item)
 	for i, length := 0, s.array.Len(); i < length; i++ {
 		if cmp.Equal(s.array.Index(i).Interface()) {
-			return true
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 func (s genericArraySequence) Count() int {
@@ -341,10 +411,6 @@ func (i mapIterator) Current() T {
 
 func (i mapIterator) Next() bool {
 	return i.i.Next()
-}
-
-func makeMapIterator(m T) Iterator {
-	return mapIterator{reflect.ValueOf(m).MapRange()}
 }
 
 func stringSequence(s string) Sequence {

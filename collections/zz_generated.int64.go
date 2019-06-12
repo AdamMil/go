@@ -68,14 +68,18 @@ func (i *int64Iterator) Next() bool {
 }
 
 func (s Int64Sequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s Int64Sequence) IndexOf(item T) int {
 	if v, ok := item.(int64); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func Int64EqualFunc(a, b T) bool {

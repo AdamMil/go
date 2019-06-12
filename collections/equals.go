@@ -95,12 +95,13 @@ func (cmp *containsComparer) Equal(elem T) bool {
 		return false
 	} else if !cmp.isEquatable { // if the items can't be compared with ==, compare the pointers
 		return reflect.ValueOf(elem).Pointer() == cmp.itemPtr // this handles slices, maps, functions, and comparisons of pointers against nil
-	} else if !cmp.isPair || t != pairType { // if the objects can normally be compared with == and we're not comparing Pair objects...
+	} else if !cmp.isPair { // if the objects can normally be compared with == and we're not comparing Pair objects...
 		return elem == cmp.item // this can panic if the items are structs with incomparable field values. oh well.
-	} else { // special-case Pair because they're so common here and we don't want to fail on Pairs with incomparable field values
+	} else if t == pairType { // special-case Pair because they're so common here and we don't want to fail on Pairs with incomparable field values
 		p := elem.(Pair)
 		return GenericEqual(cmp.item, p.Key) && GenericEqual(cmp.value, p.Value)
 	}
+	return false
 }
 
 // Determines whether a value can be compared with another value of the same type using the == operator.

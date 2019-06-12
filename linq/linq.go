@@ -24,9 +24,25 @@ package linq
 
 import (
 	"fmt"
+	"reflect"
 
 	. "bitbucket.org/adammil/go/collections"
 )
+
+func init() {
+	// register a sequence creator that turns a LINQ back into the underlying Sequence
+	RegisterSequenceCreator(reflect.TypeOf(LINQ{}), func(obj T) (Sequence, error) {
+		seq := obj.(LINQ).Sequence
+		for { // loop in case the sequence was a LINQ wrapped in a LINQ, etc.
+			if linq, ok := seq.(LINQ); ok {
+				seq = linq.Sequence
+			} else {
+				break
+			}
+		}
+		return seq, nil
+	})
+}
 
 // A LINQ represents a Sequence that can be transformed into other sequences.
 type LINQ struct {
@@ -360,7 +376,7 @@ func (s LINQ) SequenceEqualR(seq Sequence, cmp T) bool {
 
 // Appends the elements from the sequence to a slice. The updated slice is returned.
 func (s LINQ) AddToSlice(slice T) T {
-	return AddToSlice(s.Sequence, slice)
+	return AddToSlice(slice, s.Sequence)
 }
 
 // Converts the sequence to a slice.

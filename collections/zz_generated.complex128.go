@@ -68,14 +68,18 @@ func (i *complex128Iterator) Next() bool {
 }
 
 func (s Complex128Sequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s Complex128Sequence) IndexOf(item T) int {
 	if v, ok := item.(complex128); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func Complex128EqualFunc(a, b T) bool {

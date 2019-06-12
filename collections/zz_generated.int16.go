@@ -68,14 +68,18 @@ func (i *int16Iterator) Next() bool {
 }
 
 func (s Int16Sequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s Int16Sequence) IndexOf(item T) int {
 	if v, ok := item.(int16); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func Int16EqualFunc(a, b T) bool {

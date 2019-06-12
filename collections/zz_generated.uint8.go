@@ -68,14 +68,18 @@ func (i *uint8Iterator) Next() bool {
 }
 
 func (s Uint8Sequence) Contains(item T) bool {
+	return s.IndexOf(item) >= 0
+}
+
+func (s Uint8Sequence) IndexOf(item T) int {
 	if v, ok := item.(uint8); ok {
-		for i := 0; i < len(s); i++ {
-			if s[i] == v {
-				return true
+		for i, sv := range s {
+			if sv == v {
+				return i
 			}
 		}
 	}
-	return false
+	return -1
 }
 
 func Uint8EqualFunc(a, b T) bool {

@@ -49,7 +49,9 @@ func TestFunctions(t *testing.T) {
 	s, err := ToSequence([]T{1, 2})
 	assertEqual(t, err, nil)
 	ns, err := ToSequence(s) // test that a passed sequence is returned unchanged
-	assertEqual(t, s, ns)
+	assertEqual(t, ns, s)
+	ns, err = ToSequence(LINQ{LINQ{s}}) // test that a LINQ-wrapped sequence is unwrapped
+	assertEqual(t, ns, s)
 
 	// test From() with function arguments
 	n := 0
@@ -453,6 +455,8 @@ func TestLinqMaps(t *testing.T) {
 	m := map[int]string{2: "2", 0: "0", 1: "1"}
 	s := From(m)
 	assertLinqEqual(t, s.OrderBy(PairSelector(func(p Pair) T { return p.Key })), Pair{0, "0"}, Pair{1, "1"}, Pair{2, "2"})
+	assertLinqEqual(t, s.Select(SelectPairKey).Order(), 0, 1, 2)
+	assertLinqEqual(t, s.Select(SelectPairValue).Order(), "0", "1", "2")
 	sum := 0
 	s.ForEachKVR(func(k int, v string) T { sum += k; return "ignored" })
 	assertEqual(t, sum, 3)
@@ -523,9 +527,9 @@ func TestLinqOrder(t *testing.T) {
 	var p2 *int
 
 	var a, bf, bt, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, u, v, w, x, y, z, A, B, C, D, E, F, G, H, I, J, K T = nil,
-		false, true, int32(-20), -7, float64(-4.1), int64(-3), int8(-2), float32(-1.5), 0, int16(1), float64(2.34), int8(3),
-		float32(3.14), int64(4), 5, uint8(6), uint32(8), int16(9), uint16(10), uint64(11), int32(14), uint(42),
-		-2 + 8i, complex64(2 + 7i), 2 + 9i, 3 - 4i, complex64(3 + 4i),
+		false, true, int32(-20), -7, float64(-4.1), int64(-3), int8(-2), -2 + 8i, float32(-1.5), 0, int16(1), complex64(2 + 7i), 2 + 9i,
+		float64(2.34), 3 - 4i, int8(3), complex64(3 + 4i), float32(3.14), int64(4), 5, uint8(6), uint32(8), int16(9), uint16(10),
+		uint64(11), int32(14), uint(42),
 		[...]int{1, 2}, make(chan int), func() {}, make(map[T]T), p2, p1, []int{2, 3}, "Ax", "a", "x"
 
 	seq := FromItems(o, c, B, w, G, J, h, l, f, q, E, bt, i, b, z, u, I, m, e, a, A, v, F, y, D, j, r, bf, p, s, K, n, H, g, x, C, k, d)
