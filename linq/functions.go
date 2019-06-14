@@ -83,15 +83,31 @@ func SelectPairValue(item T) T {
 	return item.(Pair).Value
 }
 
+// TODO: these hand-crafted conversion functions could be replaced by a single, generic one that does everything via reflection. should we?
+
+var actionType = reflect.TypeOf(Action(nil))
+var aggregatorType = reflect.TypeOf(Aggregator(nil))
+var equalType = reflect.TypeOf(EqualFunc(nil))
+var lessThanType = reflect.TypeOf(LessThanFunc(nil))
+var predicateType = reflect.TypeOf(Predicate(nil))
+var merge1Type = reflect.TypeOf((func(T) (T, bool))(nil))
+var merge2Type = reflect.TypeOf((func(T, T) (T, bool))(nil))
+var pairActionType = reflect.TypeOf((func(T, T))(nil))
+var pairSelectorType = reflect.TypeOf((func(T, T) T)(nil))
+
 func genericActionFunc(f T) Action {
 	if f == nil { // if the function pointer is nil...
 		return nil // return a nil Action
 	} else if p, ok := f.(func(T)); ok { // otherwise, if the function is a kind of Action...
-		return p // return it. note that we check func(T) and not Action to catch all func(T)s
+		return p // return it
+	} else if q, ok := f.(Action); ok {
+		return q
 	}
 
-	t := reflect.TypeOf(f) // validate the signature of the function
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 1 {
+	t := reflect.TypeOf(f)           // validate the signature of the function
+	if t.ConvertibleTo(actionType) { // if the function is an Action by another name...
+		return reflect.ValueOf(f).Convert(actionType).Interface().(Action) // convert it
+	} else if t.Kind() != reflect.Func || t.NumIn() != 1 {
 		panic(fmt.Sprintf("called with non-action %v", f))
 	}
 	v := reflect.ValueOf(f) // if it matches, convert it to an Action that calls the function with reflection
@@ -103,10 +119,14 @@ func genericAggregatorFunc(f T) Aggregator { // see above for comments
 		return nil
 	} else if p, ok := f.(func(T, T) T); ok {
 		return p
+	} else if q, ok := f.(Aggregator); ok {
+		return q
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 {
+	if t.ConvertibleTo(aggregatorType) {
+		return reflect.ValueOf(f).Convert(aggregatorType).Interface().(Aggregator)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 {
 		panic(fmt.Sprintf("called with non-aggregator %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -121,10 +141,14 @@ func genericEqualFunc(f T) EqualFunc { // see above for comments
 		return nil
 	} else if p, ok := f.(func(T, T) bool); ok {
 		return p
+	} else if q, ok := f.(EqualFunc); ok {
+		return q
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
+	if t.ConvertibleTo(equalType) {
+		return reflect.ValueOf(f).Convert(equalType).Interface().(EqualFunc)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
 		panic(fmt.Sprintf("called with non-equality-comparer %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -139,10 +163,14 @@ func genericLessThanFunc(f T) LessThanFunc { // see above for comments
 		return nil
 	} else if p, ok := f.(func(T, T) bool); ok {
 		return p
+	} else if q, ok := f.(LessThanFunc); ok {
+		return q
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
+	if t.ConvertibleTo(lessThanType) {
+		return reflect.ValueOf(f).Convert(lessThanType).Interface().(LessThanFunc)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
 		panic(fmt.Sprintf("called with non-comparer %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -160,7 +188,9 @@ func genericMerge1Func(f T) func(T) (T, bool) { // see above for comments
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf(false) {
+	if t.ConvertibleTo(merge1Type) {
+		return reflect.ValueOf(f).Convert(merge1Type).Interface().(func(T) (T, bool))
+	} else if t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf(false) {
 		panic(fmt.Sprintf("called with non-merger %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -178,7 +208,9 @@ func genericMerge2Func(f T) func(T, T) (T, bool) { // see above for comments
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf(false) {
+	if t.ConvertibleTo(merge2Type) {
+		return reflect.ValueOf(f).Convert(merge2Type).Interface().(func(T, T) (T, bool))
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 2 || t.Out(1) != reflect.TypeOf(false) {
 		panic(fmt.Sprintf("called with non-merger %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -196,7 +228,9 @@ func genericPairAction(f T) func(T, T) { // see above for comments
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 {
+	if t.ConvertibleTo(pairActionType) {
+		return reflect.ValueOf(f).Convert(pairActionType).Interface().(func(T, T))
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 {
 		panic(fmt.Sprintf("called with non-pair-action %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -211,7 +245,9 @@ func genericPairSelector(f T) func(T, T) T { // see above for comments
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 {
+	if t.ConvertibleTo(pairSelectorType) {
+		return reflect.ValueOf(f).Convert(pairSelectorType).Interface().(func(T, T) T)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 {
 		panic(fmt.Sprintf("called with non-pair-selector %v", f))
 	}
 	v := reflect.ValueOf(f)
@@ -226,25 +262,35 @@ func genericPredicateFunc(f T) Predicate { // see above for comments
 		return nil
 	} else if p, ok := f.(func(T) bool); ok {
 		return p
+	} else if q, ok := f.(Predicate); ok {
+		return q
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
+	if t.ConvertibleTo(predicateType) {
+		return reflect.ValueOf(f).Convert(predicateType).Interface().(Predicate)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
 		panic(fmt.Sprintf("called with non-predicate %v", f))
 	}
 	v := reflect.ValueOf(f)
 	return func(i T) bool { return v.Call([]reflect.Value{reflect.ValueOf(i)})[0].Interface().(bool) }
 }
 
+var selectorType = reflect.TypeOf(Selector(nil))
+
 func genericSelectorFunc(f T) Selector { // see above for comments
 	if f == nil {
 		return nil
 	} else if p, ok := f.(func(T) T); ok {
 		return p
+	} else if q, ok := f.(Selector); ok {
+		return q
 	}
 
 	t := reflect.TypeOf(f)
-	if t == nil || t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 1 {
+	if t.ConvertibleTo(selectorType) {
+		return reflect.ValueOf(f).Convert(selectorType).Interface().(Selector)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 1 || t.NumOut() != 1 {
 		panic(fmt.Sprintf("called with non-selector %v", f))
 	}
 	v := reflect.ValueOf(f)

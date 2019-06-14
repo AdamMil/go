@@ -32,6 +32,17 @@ import (
 	. "bitbucket.org/adammil/go/collections"
 )
 
+type MyAction func(T)
+type MyAggregator func(T, T) T
+type MyEqualFunc func(T, T) bool
+type MyLessThanFunc func(T, T) bool
+type MyMerge1Func func(T) (T, bool)
+type MyMerge2Func func(T, T) (T, bool)
+type MyPairAction func(T, T)
+type MyPairSelector func(T, T) T
+type MyPredicate func(T) bool
+type MySelector func(T) T
+
 func TestFunctions(t *testing.T) {
 	t.Parallel()
 	assertLinqEqual(t, Empty)
@@ -96,6 +107,22 @@ func TestFunctions(t *testing.T) {
 	assertEqual(t, genericPairSelector(fb), fb)
 	assertEqual(t, genericPredicateFunc(ff), Predicate(ff))
 	assertEqual(t, genericSelectorFunc(fe), Selector(fe))
+	assertEqual(t, genericActionFunc(Action(fa)), Action(fa))
+	assertEqual(t, genericAggregatorFunc(Aggregator(fb)), Aggregator(fb))
+	assertEqual(t, genericEqualFunc(EqualFunc(fc)), EqualFunc(fc))
+	assertEqual(t, genericLessThanFunc(LessThanFunc(fc)), LessThanFunc(fc))
+	assertEqual(t, genericPredicateFunc(Predicate(ff)), Predicate(ff))
+	assertEqual(t, genericSelectorFunc(Selector(fe)), Selector(fe))
+	assertEqual(t, genericActionFunc(MyAction(fa)), Action(fa))
+	assertEqual(t, genericAggregatorFunc(MyAggregator(fb)), Aggregator(fb))
+	assertEqual(t, genericEqualFunc(MyEqualFunc(fc)), EqualFunc(fc))
+	assertEqual(t, genericLessThanFunc(MyLessThanFunc(fc)), LessThanFunc(fc))
+	assertEqual(t, genericMerge1Func(MyMerge1Func(fm1)), fm1)
+	assertEqual(t, genericMerge2Func(MyMerge2Func(fm2)), fm2)
+	assertEqual(t, genericPairAction(MyPairAction(fd)), fd)
+	assertEqual(t, genericPairSelector(MyPairSelector(fb)), fb)
+	assertEqual(t, genericPredicateFunc(MyPredicate(ff)), Predicate(ff))
+	assertEqual(t, genericSelectorFunc(MySelector(fe)), Selector(fe))
 }
 
 func TestLinqAggregate(t *testing.T) {
