@@ -40,21 +40,39 @@ func (s LINQ) FirstR(pred T) T {
 	return s.WhereR(pred).First()
 }
 
+// Returns the first item in the sequence if it exists, or the given default otherwise.
+func (s LINQ) FirstOrDefault(defaultValue T) T {
+	if item, ok := s.TryFirst(); ok {
+		return item
+	}
+	return defaultValue
+}
+
+// Returns the first item in the sequence matching the given predicate, or the given default if no items match.
+func (s LINQ) FirstOrDefaultP(defaultValue T, pred Predicate) T {
+	return s.Where(pred).FirstOrDefault(defaultValue)
+}
+
+// Returns the first item in the sequence matching the given predicate, or the given default if no items match.
+// If the predicate is strongly typed, it will be called via reflection.
+func (s LINQ) FirstOrDefaultR(defaultValue T, pred T) T {
+	return s.WhereR(pred).FirstOrDefault(defaultValue)
+}
+
 // Returns the first item in the sequence if it exists, or nil otherwise.
 func (s LINQ) FirstOrNil() T {
-	item, _ := s.TryFirst()
-	return item
+	return s.FirstOrDefault(nil)
 }
 
 // Returns the first item in the sequence matching the given predicate, or nil if no items match.
 func (s LINQ) FirstOrNilP(pred Predicate) T {
-	return s.Where(pred).FirstOrNil()
+	return s.FirstOrDefaultP(nil, pred)
 }
 
 // Returns the first item in the sequence matching the given predicate, or nil if no items match.
 // If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) FirstOrNilR(pred T) T {
-	return s.WhereR(pred).FirstOrNil()
+	return s.FirstOrDefaultR(nil, pred)
 }
 
 // Returns the first item in the sequence if it exists.
@@ -95,21 +113,39 @@ func (s LINQ) LastR(pred T) T {
 	return s.WhereR(pred).Last()
 }
 
+// Returns the last item in the sequence if it exists, or the given default otherwise.
+func (s LINQ) LastOrDefault(defaultValue T) T {
+	if item, ok := s.TryLast(); ok {
+		return item
+	}
+	return defaultValue
+}
+
+// Returns the last item in the sequence matching the given predicate, or the given default if no items match.
+func (s LINQ) LastOrDefaultP(defaultValue T, pred Predicate) T {
+	return s.Where(pred).LastOrDefault(defaultValue)
+}
+
+// Returns the last item in the sequence matching the given predicate, or the given default if no items match.
+// If the predicate is strongly typed, it will be called via reflection.
+func (s LINQ) LastOrDefaultR(defaultValue T, pred T) T {
+	return s.WhereR(pred).LastOrDefault(defaultValue)
+}
+
 // Returns the last item in the sequence if it exists, or nil otherwise.
 func (s LINQ) LastOrNil() T {
-	item, _ := s.TryLast()
-	return item
+	return s.LastOrDefault(nil)
 }
 
 // Returns the last item in the sequence matching the given predicate, or nil if no items match.
 func (s LINQ) LastOrNilP(pred Predicate) T {
-	return s.Where(pred).LastOrNil()
+	return s.LastOrDefaultP(nil, pred)
 }
 
 // Returns the last item in the sequence matching the given predicate, or nil if no items match.
 // If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) LastOrNilR(pred T) T {
-	return s.WhereR(pred).LastOrNil()
+	return s.LastOrDefaultR(nil, pred)
 }
 
 // Returns the last item in the sequence if it exists.
@@ -157,8 +193,9 @@ func (s LINQ) SingleR(pred T) T {
 	return s.WhereR(pred).Single()
 }
 
-// Returns the first item in the sequence, or returns nil if the sequence is empty, or panics if the sequence has multiple items.
-func (s LINQ) SingleOrNil() T {
+// Returns the first item in the sequence, or returns the given default if the sequence is empty, or panics if the sequence has
+// multiple items.
+func (s LINQ) SingleOrDefault(defaultValue T) T {
 	if i := s.Iterator(); i.Next() {
 		v := i.Current()
 		if !i.Next() {
@@ -166,19 +203,36 @@ func (s LINQ) SingleOrNil() T {
 		}
 		panic(error(tooManyItemsError{}))
 	}
-	return nil
+	return defaultValue
+}
+
+// Returns the first item in the sequence matching the given predicate, or returns the given default if no items match, or panics if
+// multiple items match.
+func (s LINQ) SingleOrDefaultP(defaultValue T, pred Predicate) T {
+	return s.Where(pred).SingleOrDefault(defaultValue)
+}
+
+// Returns the first item in the sequence matching the given predicate, or returns the given default if no items match, or panics if
+// multiple items match. If the predicate is strongly typed, it will be called via reflection.
+func (s LINQ) SingleOrDefaultR(defaultValue T, pred T) T {
+	return s.WhereR(pred).SingleOrDefault(defaultValue)
+}
+
+// Returns the first item in the sequence, or returns nil if the sequence is empty, or panics if the sequence has multiple items.
+func (s LINQ) SingleOrNil() T {
+	return s.SingleOrDefault(nil)
 }
 
 // Returns the first item in the sequence matching the given predicate, or returns nil if no items match, or panics if
 // multiple items match.
 func (s LINQ) SingleOrNilP(pred Predicate) T {
-	return s.Where(pred).SingleOrNil()
+	return s.SingleOrDefaultP(nil, pred)
 }
 
 // Returns the first item in the sequence matching the given predicate, or returns nil if no items match, or panics if
 // multiple items match. If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) SingleOrNilR(pred T) T {
-	return s.WhereR(pred).SingleOrNil()
+	return s.SingleOrDefaultR(nil, pred)
 }
 
 // Returns the first item in the sequence or an error if the sequence is empty or has multiple items.

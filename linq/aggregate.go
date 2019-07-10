@@ -55,10 +55,27 @@ func (s LINQ) AggregateR(agg T) T {
 
 // Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
 // are passed to the function, and so on. The final return value from the function is returned. However, if the sequence contains only
+// a single item, that item is returned, and if the sequence is empty, the function returns the given default.
+func (s LINQ) AggregateOrDefault(defaultValue T, agg Aggregator) T {
+	if item, ok := s.TryAggregate(agg); ok {
+		return item
+	}
+	return defaultValue
+}
+
+// Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
+// are passed to the function, and so on. The final return value from the function is returned. However, if the sequence contains only
+// a single item, that item is returned, and if the sequence is empty, the function returns the given default.
+// If the aggregator is strongly typed, it will be called via reflection.
+func (s LINQ) AggregateOrDefaultR(defaultValue T, agg T) T {
+	return s.AggregateOrDefault(defaultValue, genericAggregatorFunc(agg))
+}
+
+// Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
+// are passed to the function, and so on. The final return value from the function is returned. However, if the sequence contains only
 // a single item, that item is returned, and if the sequence is empty, the function returns nil.
 func (s LINQ) AggregateOrNil(agg Aggregator) T {
-	item, _ := s.TryAggregate(agg)
-	return item
+	return s.AggregateOrDefault(nil, agg)
 }
 
 // Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
@@ -66,7 +83,7 @@ func (s LINQ) AggregateOrNil(agg Aggregator) T {
 // a single item, that item is returned, and if the sequence is empty, the function returns nil.
 // If the aggregator is strongly typed, it will be called via reflection.
 func (s LINQ) AggregateOrNilR(agg T) T {
-	return s.AggregateOrNil(genericAggregatorFunc(agg))
+	return s.AggregateOrDefaultR(nil, agg)
 }
 
 // Aggregates items from the sequence. The first two items are passed to the aggregator function, then the result and the third item
@@ -135,25 +152,43 @@ func (s LINQ) MaxR(cmp T) T {
 }
 
 // Returns the item from the sequence with the greatest value according to the given comparison function, or if the sequence is
+// empty the function returns the given default.
+func (s LINQ) MaxOrDefault(defaultValue T) T {
+	return s.AggregateOrDefault(defaultValue, max)
+}
+
+// Returns the item from the sequence with the greatest value according to the given comparison function, or if the sequence is
+// empty the function returns the given default.
+func (s LINQ) MaxOrDefaultP(defaultValue T, cmp LessThanFunc) T {
+	if cmp == nil {
+		return s.MaxOrDefault(defaultValue)
+	} else {
+		return s.AggregateOrDefault(defaultValue, maxf(cmp))
+	}
+}
+
+// Returns the item from the sequence with the greatest value according to the given function, or if the sequence is
+// empty the function returns the given default. If the comparer is strongly typed, it will be called via reflection.
+func (s LINQ) MaxOrDefaultR(defaultValue T, cmp T) T {
+	return s.MaxOrDefaultP(defaultValue, genericLessThanFunc(cmp))
+}
+
+// Returns the item from the sequence with the greatest value according to the given comparison function, or if the sequence is
 // empty the function returns nil.
 func (s LINQ) MaxOrNil() T {
-	return s.AggregateOrNil(max)
+	return s.MaxOrDefault(nil)
 }
 
 // Returns the item from the sequence with the greatest value according to the given comparison function, or if the sequence is
 // empty the function returns nil.
 func (s LINQ) MaxOrNilP(cmp LessThanFunc) T {
-	if cmp == nil {
-		return s.MaxOrNil()
-	} else {
-		return s.AggregateOrNil(maxf(cmp))
-	}
+	return s.MaxOrDefaultP(nil, cmp)
 }
 
 // Returns the item from the sequence with the greatest value according to the given function, or if the sequence is
 // empty the function returns nil. If the comparer is strongly typed, it will be called via reflection.
 func (s LINQ) MaxOrNilR(cmp T) T {
-	return s.MaxOrNilP(genericLessThanFunc(cmp))
+	return s.MaxOrDefaultR(nil, cmp)
 }
 
 // Returns the item from the sequence with the greatest value according to the default comparison function along with a true value
@@ -282,25 +317,43 @@ func (s LINQ) MinR(cmp T) T {
 }
 
 // Returns the item from the sequence with the least value according to the given comparison function, or if the sequence is
+// empty the function returns the given default.
+func (s LINQ) MinOrDefault(defaultValue T) T {
+	return s.AggregateOrDefault(defaultValue, min)
+}
+
+// Returns the item from the sequence with the least value according to the given comparison function, or if the sequence is
+// empty the function returns the given default.
+func (s LINQ) MinOrDefaultP(defaultValue T, cmp LessThanFunc) T {
+	if cmp == nil {
+		return s.MinOrDefault(defaultValue)
+	} else {
+		return s.AggregateOrDefault(defaultValue, minf(cmp))
+	}
+}
+
+// Returns the item from the sequence with the least value according to the given function, or if the sequence is
+// empty the function returns the given default. If the comparer is strongly typed, it will be called via reflection.
+func (s LINQ) MinOrDefaultR(defaultValue T, cmp T) T {
+	return s.MinOrDefaultP(defaultValue, genericLessThanFunc(cmp))
+}
+
+// Returns the item from the sequence with the least value according to the given comparison function, or if the sequence is
 // empty the function returns nil.
 func (s LINQ) MinOrNil() T {
-	return s.AggregateOrNil(min)
+	return s.MinOrDefault(nil)
 }
 
 // Returns the item from the sequence with the least value according to the given comparison function, or if the sequence is
 // empty the function returns nil.
 func (s LINQ) MinOrNilP(cmp LessThanFunc) T {
-	if cmp == nil {
-		return s.MinOrNil()
-	} else {
-		return s.AggregateOrNil(minf(cmp))
-	}
+	return s.MinOrDefaultP(nil, cmp)
 }
 
 // Returns the item from the sequence with the least value according to the given function, or if the sequence is
 // empty the function returns nil. If the comparer is strongly typed, it will be called via reflection.
 func (s LINQ) MinOrNilR(cmp T) T {
-	return s.MinOrNilP(genericLessThanFunc(cmp))
+	return s.MinOrDefaultR(nil, cmp)
 }
 
 // Returns the item from the sequence with the least value according to the default comparison function along with a true value
@@ -333,10 +386,27 @@ func (s LINQ) Sum() T {
 }
 
 // Returns the sum of the items in the sequence plus the seed value. Most numeric values can be added together, although signed and
-// unsigned integers  cannot. A sequence of strings will be concatenated. The result will always be normalized into either an int64,
+// unsigned integers cannot. A sequence of strings will be concatenated. The result will always be normalized into either an int64,
 // uint64, float64, complex128, or string. If the sequence is empty, the function returns the normalized seed.
 func (s LINQ) SumFrom(seed T) T {
 	return normalizeSum(s.AggregateFrom(seed, genericAdd))
+}
+
+// Returns the sum of the items in the sequence. Most numeric values can be added together, although signed and unsigned integers
+// cannot. A sequence of strings will be concatenated. The result will always be normalized into either an int64, uint64, float64,
+// complex128, or string. If the sequence is empty, the function returns the given default (without normalizing it).
+func (s LINQ) SumOrDefault(defaultValue T) T {
+	if sum, ok := s.TryAggregate(genericAdd); ok {
+		return sum
+	}
+	return defaultValue
+}
+
+// Returns the sum of the items in the sequence. Most numeric values can be added together, although signed and unsigned integers
+// cannot. A sequence of strings will be concatenated. The result will always be normalized into either an int64, uint64, float64,
+// complex128, or string. If the sequence is empty, the function returns nil.
+func (s LINQ) SumOrNil() T {
+	return s.SumOrDefault(nil)
 }
 
 // Returns the sum of the items in the sequence. Most numeric values can be added together, although signed and unsigned integers

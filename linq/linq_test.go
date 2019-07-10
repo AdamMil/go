@@ -130,6 +130,10 @@ func TestLinqAggregate(t *testing.T) {
 
 	// test sum
 	assertEqual(t, Range2(1, 100).SumFrom(505), int64(5555))
+	assertEqual(t, Empty.SumOrDefault(505), 505)
+	assertEqual(t, Range2(1, 100).SumOrDefault(505), int64(5050))
+	assertEqual(t, Empty.SumOrNil(), nil)
+	assertEqual(t, Range2(1, 100).SumOrNil(), int64(5050))
 	assertEqual(t, FromItems( // try to cover all the different possible type combinations
 		nil, int8(1), int16(2), int32(4), int64(8), 16, nil,
 		float32(32.5), float64(64.25), 0.125, int8(-7), int16(128), int32(-256), int64(512), -1024, nil,
@@ -193,9 +197,11 @@ func TestLinqAggregate(t *testing.T) {
 	assertEqual(t, s.Max(), 9)
 	assertEqual(t, s.MaxP(nil), 9)
 	assertEqual(t, s.MaxR(abscmp), 9)
+	assertEqual(t, s.MinOrDefaultR(7, abscmp), 2)
 	assertEqual(t, s.MinOrNil(), -4)
 	assertEqual(t, s.MinOrNilP(nil), -4)
 	assertEqual(t, s.MinOrNilR(abscmp), 2)
+	assertEqual(t, s.MaxOrDefaultR(7, abscmp), 9)
 	assertEqual(t, s.MaxOrNil(), 9)
 	assertEqual(t, s.MaxOrNilP(nil), 9)
 	assertEqual(t, s.MaxOrNilR(abscmp), 9)
@@ -217,6 +223,8 @@ func TestLinqAggregate(t *testing.T) {
 	v, ok = s.TryMaxR(abscmp)
 	assertEqual(t, v, 9)
 	assertTrue(t, ok, "s.TryMaxR")
+	assertEqual(t, Empty.MinOrDefault(42), 42)
+	assertEqual(t, Empty.MaxOrDefault(42), 42)
 	assertEqual(t, Empty.MinOrNil(), nil)
 	assertEqual(t, Empty.MaxOrNil(), nil)
 	assertPanic(t, func() { Empty.Min() }, "empty")
@@ -233,6 +241,9 @@ func TestLinqAggregate(t *testing.T) {
 	// test general aggregation methods not covered by the above
 	assertEqual(t, Range2(1, 10).AggregateR(func(a, b int) int { return a * b }), 3628800)
 	assertEqual(t, Range2(1, 10).AggregateFromR(-7, func(a, b int) int { return a * b }), -25401600)
+	assertEqual(t, Range2(1, 10).AggregateOrDefaultR(-7, func(a, b int) int { return a * b }), 3628800)
+	assertEqual(t, Empty.AggregateOrDefaultR(3, func(int, int) int { return 5 }), 3)
+	assertEqual(t, Empty.AggregateOrNil(func(T, T) T { return "" }), nil)
 	assertEqual(t, Empty.AggregateOrNilR(func(T, T) string { return "" }), nil)
 	_, ok = Empty.TryAggregateR(func(T, T) string { return "" })
 	assertFalse(t, ok, "Empty.TryAggregateR")
@@ -289,9 +300,11 @@ func TestLinqBasics(t *testing.T) {
 
 	assertEqual(t, s.First(), 9)
 	assertPanic(t, func() { Empty.First() }, "empty")
+	assertEqual(t, s.FirstOrDefault(2), 9)
 	assertEqual(t, s.FirstOrNil(), 9)
 	assertEqual(t, s.FirstP(func(i T) bool { return lt5(i.(int)) }), 1)
 	assertEqual(t, s.FirstR(lt5), 1)
+	assertEqual(t, s.FirstOrDefaultR(1, gt10), 1)
 	assertEqual(t, s.FirstOrNilP(func(i T) bool { return lt5(i.(int)) }), 1)
 	assertEqual(t, s.FirstOrNilR(gt10), nil)
 	i, ok := s.TryFirstP(func(i T) bool { return lt5(i.(int)) })
@@ -302,9 +315,12 @@ func TestLinqBasics(t *testing.T) {
 
 	assertEqual(t, s.Last(), 0)
 	assertPanic(t, func() { Empty.Last() }, "empty")
+	assertEqual(t, s.LastOrDefault(3), 0)
 	assertEqual(t, s.LastOrNil(), 0)
 	assertEqual(t, s.LastP(func(i T) bool { return gt5(i.(int)) }), 6)
 	assertEqual(t, s.LastR(gt5), 6)
+	assertEqual(t, s.LastOrDefaultP(7, func(i T) bool { return gt5(i.(int)) }), 6)
+	assertEqual(t, s.LastOrDefaultR(7, gt10), 7)
 	assertEqual(t, s.LastOrNilP(func(i T) bool { return gt5(i.(int)) }), 6)
 	assertEqual(t, s.LastOrNilR(gt10), nil)
 	i, ok = s.TryLastP(func(i T) bool { return gt5(i.(int)) })
@@ -397,12 +413,15 @@ func TestLinqBasics(t *testing.T) {
 	_, err = s.TrySingleR(gt10)
 	assertTrue(t, IsEmptyError(err), "TrySingleR(> 10)")
 	assertPanic(t, func() { s.Single() }, "too many items")
+	assertPanic(t, func() { s.SingleOrDefault(3) }, "too many items")
 	assertPanic(t, func() { s.SingleOrNil() }, "too many items")
 	assertPanic(t, func() { Empty.Single() }, "empty")
 	_, err = s.TrySingle()
 	assertTrue(t, IsTooManyItemsError(err), "TrySingle matches too many")
 	assertEqual(t, s.SingleP(func(i T) bool { return i.(int) == 3 }), 3)
 	assertEqual(t, s.SingleR(func(i int) bool { return i == 4 }), 4)
+	assertEqual(t, s.SingleOrDefaultP(7, func(i T) bool { return i.(int) < 0 }), 7)
+	assertEqual(t, s.SingleOrDefaultR(7, func(i int) bool { return i == 5 }), 5)
 	assertEqual(t, s.SingleOrNilP(func(i T) bool { return i.(int) < 0 }), nil)
 	assertEqual(t, s.SingleOrNilR(func(i int) bool { return i == 5 }), 5)
 
