@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 )
 
@@ -215,14 +216,14 @@ func TestOrder(t *testing.T) {
 	p1 := &intv
 	var p2 *int
 
-	var a, bf, bt, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, u, v, w, x, y, z, A, B, C, D, E, F, G, H, I, J, K, L, M T = nil,
+	var a, bf, bt, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, u, v, w, x, y, z, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O T = nil,
 		false, true, int32(-20), -7, float64(-4.1), int64(-3), int8(-2), -2 + 8i, float32(-1.5), 0, int16(1), complex64(2 + 7i), 2 + 9i,
 		float64(2.34), 3 - 4i, int8(3), complex64(3 + 4i), float32(3.14), int64(4), 5, uint8(6), uint32(8), int16(9), uint16(10), uint64(11),
 		uintptr(12), int32(14), uint(42), uintptr(60),
-		[...]int{1, 2}, make(chan int), func() {}, make(map[T]T), p2, p1, []int{2, 3}, "Ax", "a", "x"
+		[...]int{1, 2}, make(chan int), func() {}, make(map[T]T), p2, p1, []int{2, 3}, "Ax", "a", "x", time.Now(), time.Now().Add(time.Hour)
 
-	seq, _ := ToList([]T{o, c, B, w, G, J, h, l, f, M, q, E, bt, i, b, z, u, I, m, e, a, A, v, F, y, L, D, j, r, bf, p, s, K, n, H, g, x, C, k, d})
-	ord := []T{a, bf, bt, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, u, v, w, x, y, z, A, B, C, D, E, F, G, H, I, J, K, L, M}
+	seq, _ := ToList([]T{o, c, B, w, G, J, h, O, l, f, M, q, E, bt, i, b, z, u, I, m, e, a, A, v, F, y, N, L, D, j, r, bf, p, s, K, n, H, g, x, C, k, d})
+	ord := []T{a, bf, bt, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, u, v, w, x, y, z, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O}
 	sort.Sort(seq.(sort.Interface))
 	assertListEqual(t, seq, ord...)
 

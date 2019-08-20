@@ -23,16 +23,21 @@ package collections
 import (
 	"fmt"
 	"reflect"
+	"time"
 )
+
+var timeType = reflect.TypeOf(time.Time{})
 
 // Determines whether a < b in a generic fashion that allows almost any value to be compared with almost any other value.
 func GenericLessThan(a, b T) bool {
+	var ta reflect.Type
 	var ka reflect.Kind
 	if a != nil {
 		if b == nil {
 			return false
 		}
-		ka = reflect.TypeOf(a).Kind()
+		ta = reflect.TypeOf(a)
+		ka = ta.Kind()
 	}
 	switch ka {
 	case reflect.Invalid: // a is nil
@@ -83,9 +88,12 @@ func GenericLessThan(a, b T) bool {
 			return reflect.ValueOf(a).Pointer() < reflect.ValueOf(b).Pointer()
 		}
 	default:
-		kb := reflect.TypeOf(b).Kind()
+		tb := reflect.TypeOf(b)
+		kb := tb.Kind()
 		if ka != kb {
 			return ka < kb
+		} else if ta == tb && ta == timeType {
+			return a.(time.Time).Before(b.(time.Time))
 		} else {
 			panic(fmt.Sprintf("type %T is not comparable", a))
 		}
