@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package linq
 
-import . "bitbucket.org/adammil/go/collections"
+import . "github.com/AdamMil/go/collections"
 
 // Returns the sequence without duplicates (using go's rules for the equality of map keys). Order is preserved, so
 // the first of item in each set of duplicates will be included in the resulting sequence.

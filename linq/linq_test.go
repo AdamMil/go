@@ -29,7 +29,7 @@ import (
 	"time"
 	"unsafe"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 type MyAction func(T)
@@ -39,6 +39,7 @@ type MyLessThanFunc func(T, T) bool
 type MyMerge1Func func(T) (T, bool)
 type MyMerge2Func func(T, T) (T, bool)
 type MyPairAction func(T, T)
+type MyPairPredicate func(T, T) bool
 type MyPairSelector func(T, T) T
 type MyPredicate func(T) bool
 type MySelector func(T) T
@@ -92,6 +93,7 @@ func TestFunctions(t *testing.T) {
 	assertEqual(t, genericMerge1Func(nil), (func(T) (T, bool))(nil))
 	assertEqual(t, genericMerge2Func(nil), (func(T, T) (T, bool))(nil))
 	assertEqual(t, genericPairAction(nil), (func(T, T))(nil))
+	assertEqual(t, genericPairPredicate(nil), (func(T, T) bool)(nil))
 	assertEqual(t, genericPairSelector(nil), (func(T, T) T)(nil))
 	assertEqual(t, genericPredicateFunc(nil), Predicate(nil))
 	assertEqual(t, genericSelectorFunc(nil), Selector(nil))
@@ -104,6 +106,7 @@ func TestFunctions(t *testing.T) {
 	assertEqual(t, genericMerge1Func(fm1), fm1)
 	assertEqual(t, genericMerge2Func(fm2), fm2)
 	assertEqual(t, genericPairAction(fd), fd)
+	assertEqual(t, genericPairPredicate(fc), fc)
 	assertEqual(t, genericPairSelector(fb), fb)
 	assertEqual(t, genericPredicateFunc(ff), Predicate(ff))
 	assertEqual(t, genericSelectorFunc(fe), Selector(fe))
@@ -120,6 +123,7 @@ func TestFunctions(t *testing.T) {
 	assertEqual(t, genericMerge1Func(MyMerge1Func(fm1)), fm1)
 	assertEqual(t, genericMerge2Func(MyMerge2Func(fm2)), fm2)
 	assertEqual(t, genericPairAction(MyPairAction(fd)), fd)
+	assertEqual(t, genericPairPredicate(MyPairPredicate(fc)), fc)
 	assertEqual(t, genericPairSelector(MyPairSelector(fb)), fb)
 	assertEqual(t, genericPredicateFunc(MyPredicate(ff)), Predicate(ff))
 	assertEqual(t, genericSelectorFunc(MySelector(fe)), Selector(fe))
@@ -390,6 +394,7 @@ func TestLinqBasics(t *testing.T) {
 	assertPanic(t, func() { Empty.SequenceEqualR(Empty, func(int, int) {}) }, "called with non-equality-comparer")
 
 	assertLinqEqual(t, Range(3).SelectR(func(i int) int { return i + 1 }), 1, 2, 3)
+	assertLinqEqual(t, Range(3).SelectR(func(i int) Pair { return Pair{i, i * 2} }).SelectKV(func(k, v T) T { return k.(int) + v.(int) }), 0, 3, 6)
 	assertLinqEqual(t, Range(3).SelectR(func(i int) Pair { return Pair{i, i * 2} }).SelectKVR(func(k, v int) int { return k + v }), 0, 3, 6)
 	assertPanic(t, func() { Range(1).SelectR(func(i int) {}) }, "called with non-selector")
 	assertPanic(t, func() { Range(1).SelectR(func(int, int) T { return nil }) }, "called with non-selector")
@@ -503,7 +508,12 @@ func TestLinqMaps(t *testing.T) {
 	assertLinqEqual(t, s.OrderBy(PairSelector(func(p Pair) T { return p.Key })), Pair{0, "0"}, Pair{1, "1"}, Pair{2, "2"})
 	assertLinqEqual(t, s.Select(SelectPairKey).Order(), 0, 1, 2)
 	assertLinqEqual(t, s.Select(SelectPairValue).Order(), "0", "1", "2")
+	assertLinqEqual(t, s.WhereKV(func(k, v T) bool { return k.(int) == 1 }), Pair{1, "1"})
+	assertLinqEqual(t, s.WhereKVR(func(i int, s string) bool { return i == 1 }), Pair{1, "1"})
 	sum := 0
+	s.ForEachKV(func(k, v T) { sum += k.(int) })
+	assertEqual(t, sum, 3)
+	sum = 0
 	s.ForEachKVR(func(k int, v string) T { sum += k; return "ignored" })
 	assertEqual(t, sum, 3)
 	assertPanic(t, func() { s.ForEachKVR(func(int) {}) }, "called with non-pair-action")
@@ -511,6 +521,7 @@ func TestLinqMaps(t *testing.T) {
 	s.ForEachR(PairAction(func(p Pair) { sum += p.Key.(int) })) // test PairAction
 	assertEqual(t, sum, 3)
 	assertEqual(t, s.Where(PairPredicate(func(p Pair) bool { return p.Key.(int) > 1 })).Count(), 1) // test PairPredicate
+	assertPanic(t, func() { s.WhereKVR(func(int) {}) }, "called with non-pair-predicate")
 
 	// test producing maps
 	mul, mulg := func(i int) int { return i * 2 }, func(i T) T { return i.(int) * 2 }

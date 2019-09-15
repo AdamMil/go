@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"reflect"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 func init() {
@@ -191,16 +191,13 @@ func (s LINQ) ForEachIV(action func(int, T)) LINQ {
 
 // Calls an action with the key and value of each item in the sequence, assuming the items are Pairs.
 func (s LINQ) ForEachKV(action func(T, T)) LINQ {
-	return s.ForEach(func(i T) {
-		p := i.(Pair)
-		action(p.Key, p.Value)
-	})
+	return s.ForEach(KVAction(action))
 }
 
 // Calls an action with the key and value of each item in the sequence, assuming the items are Pairs.
 // If the action is strongly typed, it will be called via reflection.
 func (s LINQ) ForEachKVR(action T) LINQ {
-	return s.ForEachKV(genericPairAction(action))
+	return s.ForEach(KVActionR(action))
 }
 
 // Transforms the sequence into a sequence of pairs whose keys are the result of the keySelector and whose values are sequences of
@@ -293,17 +290,14 @@ func (s LINQ) SelectR(selector T) LINQ {
 }
 
 // Calls an action with the key and value of each item in the sequence, assuming the items are Pairs.
-func (s LINQ) SelectKV(selector func(k, v T) T) LINQ {
-	return s.Select(func(i T) T {
-		p := i.(Pair)
-		return selector(p.Key, p.Value)
-	})
+func (s LINQ) SelectKV(selector func(T, T) T) LINQ {
+	return s.Select(KVSelector(selector))
 }
 
 // Calls an action with the key and value of each item in the sequence, assuming the items are Pairs.
 // If the selector is strongly typed, it will be called via reflection.
 func (s LINQ) SelectKVR(selector T) LINQ {
-	return s.SelectKV(genericPairSelector(selector))
+	return s.Select(KVSelectorR(selector))
 }
 
 // Transforms each item into a sequence using the selector - nils are considered empty sequences - and returns a new sequence that
@@ -410,6 +404,18 @@ func (s LINQ) Where(pred Predicate) LINQ {
 // If the predicate is strongly typed, it will be called via reflection.
 func (s LINQ) WhereR(pred T) LINQ {
 	return s.Where(genericPredicateFunc(pred))
+}
+
+// Filters the sequence to remove items that do not match the given predicate, assuming the items are Pairs.
+// The predicate is called with the key and value of each pair.
+func (s LINQ) WhereKV(pred func(T, T) bool) LINQ {
+	return s.Where(KVPredicate(pred))
+}
+
+// Filters the sequence to remove items that do not match the given predicate, assuming the items are Pairs. The predicate is called
+// with the key and value of each pair. If the predicate is strongly typed, it will be called via reflection.
+func (s LINQ) WhereKVR(pred T) LINQ {
+	return s.Where(KVPredicateR(pred))
 }
 
 // Returns a sequence of integers from 0 to n-1 (inclusive). If n is negative, the sequence will be empty.

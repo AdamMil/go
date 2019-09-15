@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package linq
 
-import . "bitbucket.org/adammil/go/collections"
+import . "github.com/AdamMil/go/collections"
 
 // Returns the sequence with the given number of items removed from the front. If the number is larger than the length of the sequence,
 // the returned sequence will be empty.

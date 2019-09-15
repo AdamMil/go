@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 // An Action performs an action a value. It is a func(T).
@@ -53,6 +53,51 @@ func FromIteratorFunction(f IteratorFunc) LINQ {
 // Creates a LINQ object from a SequenceFunc.
 func FromSequenceFunction(f SequenceFunc) LINQ {
 	return LINQ{MakeFunctionSequence(f)}
+}
+
+// Converts a weakly typed two-argument function into an Action. It is meant to be used with sequences of pairs,
+// such as those from a map.
+func KVAction(f func(T,T)) Action {
+	return func(i T) {
+		p := i.(Pair)
+		f(p.Key, p.Value)
+	}
+}
+
+// Converts a strongly typed two-argument predicate function into a Predicate. It is meant to be used with sequences of pairs,
+// such as those from a map.
+func KVPredicate(f func(T,T) bool) Predicate {
+	return func(i T) bool {
+		p := i.(Pair)
+		return f(p.Key, p.Value)
+	}
+}
+
+// Converts a strongly typed two-argument selector function into a Selector. It is meant to be used with sequences of pairs,
+// such as those from a map.
+func KVSelector(f func(T,T) T) Selector {
+	return func(i T) T {
+		p := i.(Pair)
+		return f(p.Key, p.Value)
+	}
+}
+
+// Converts a strongly typed two-argument function into an Action. It is meant to be used with sequences of pairs,
+// such as those from a map.
+func KVActionR(f T) Action {
+	return KVAction(genericPairAction(f))
+}
+
+// Converts a strongly typed two-argument predicate function into a Predicate. It is meant to be used with sequences of pairs,
+// such as those from a map.
+func KVPredicateR(f T) Predicate {
+	return KVPredicate(genericPairPredicate(f))
+}
+
+// Converts a strongly typed two-argument selector function into a Selector. It is meant to be used with sequences of pairs,
+// such as those from a map.
+func KVSelectorR(f T) Selector {
+	return KVSelector(genericPairSelector(f))
 }
 
 // Converts a func(Pair) to an Action that can be passed to s.ForEach, for example. It is meant to be used with sequences of Pairs,
@@ -93,7 +138,9 @@ var predicateType = reflect.TypeOf(Predicate(nil))
 var merge1Type = reflect.TypeOf((func(T) (T, bool))(nil))
 var merge2Type = reflect.TypeOf((func(T, T) (T, bool))(nil))
 var pairActionType = reflect.TypeOf((func(T, T))(nil))
+var pairPredicateType = reflect.TypeOf((func(T, T) bool)(nil))
 var pairSelectorType = reflect.TypeOf((func(T, T) T)(nil))
+var selectorType = reflect.TypeOf(Selector(nil))
 
 func genericActionFunc(f T) Action {
 	if f == nil { // if the function pointer is nil...
@@ -237,6 +284,25 @@ func genericPairAction(f T) func(T, T) { // see above for comments
 	return func(a, b T) { v.Call([]reflect.Value{reflect.ValueOf(a), reflect.ValueOf(b)}) }
 }
 
+func genericPairPredicate(f T) func(T, T) bool { // see above for comments
+	if f == nil {
+		return nil
+	} else if p, ok := f.(func(T, T) bool); ok {
+		return p
+	}
+
+	t := reflect.TypeOf(f)
+	if t.ConvertibleTo(pairPredicateType) {
+		return reflect.ValueOf(f).Convert(pairPredicateType).Interface().(func(T, T) bool)
+	} else if t.Kind() != reflect.Func || t.NumIn() != 2 || t.NumOut() != 1 || t.Out(0) != reflect.TypeOf(false) {
+		panic(fmt.Sprintf("called with non-pair-predicate %v", f))
+	}
+	v := reflect.ValueOf(f)
+	return func(a, b T) bool {
+		return v.Call([]reflect.Value{reflect.ValueOf(a), reflect.ValueOf(b)})[0].Interface().(bool)
+	}
+}
+
 func genericPairSelector(f T) func(T, T) T { // see above for comments
 	if f == nil {
 		return nil
@@ -252,8 +318,7 @@ func genericPairSelector(f T) func(T, T) T { // see above for comments
 	}
 	v := reflect.ValueOf(f)
 	return func(a, b T) T {
-		va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
-		return v.Call([]reflect.Value{va, vb})[0].Interface()
+		return v.Call([]reflect.Value{reflect.ValueOf(a), reflect.ValueOf(b)})[0].Interface()
 	}
 }
 
@@ -275,8 +340,6 @@ func genericPredicateFunc(f T) Predicate { // see above for comments
 	v := reflect.ValueOf(f)
 	return func(i T) bool { return v.Call([]reflect.Value{reflect.ValueOf(i)})[0].Interface().(bool) }
 }
-
-var selectorType = reflect.TypeOf(Selector(nil))
 
 func genericSelectorFunc(f T) Selector { // see above for comments
 	if f == nil {

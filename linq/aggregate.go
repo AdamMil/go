@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 // MergeKeep can be passed to Merge to keep a value when it exists on only one side.

@@ -22,7 +22,7 @@ package linq
 import (
 	"sort"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 // Returns the sequence ordered using the default comparison function (which can compare all numerics against each other,

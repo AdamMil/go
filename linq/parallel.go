@@ -24,7 +24,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 // Calls an action for each item in the sequence. The items are processed in parallel, with up to 'threads' items being processed at a

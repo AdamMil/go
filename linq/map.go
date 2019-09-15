@@ -22,7 +22,7 @@ package linq
 import (
 	"reflect"
 
-	. "bitbucket.org/adammil/go/collections"
+	. "github.com/AdamMil/go/collections"
 )
 
 // Adds the sequence to a map, assuming the sequence is a sequence of Pairs. The key and value from each Pair will become the

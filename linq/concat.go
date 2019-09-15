@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 package linq
 
-import . "bitbucket.org/adammil/go/collections"
+import . "github.com/AdamMil/go/collections"
 
 // Returns the sequence with the given items appended to it.
 func (s LINQ) Append(items ...T) LINQ {
