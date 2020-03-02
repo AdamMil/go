@@ -52,7 +52,7 @@ spent.
 topCustomers = From(orders).
     GroupByR(func(o Order) T { return o.CustomerId }).
     SelectKVR(func(custId int, orders LINQ) T {
-        return Pair{custId, orders.SelectR(func(o Order) { return o.Total }).Sum()}).
+        return Pair{custId, orders.SelectR(func(o Order) T { return o.Total }).Sum()}).
     WhereKVR(func(custId int, total int64) T { return total > 1000 }).
     OrderByDescending(SelectPairValue)
 ```
@@ -63,7 +63,7 @@ interesting results into a database, in parallel.
 ```go
 From(channel).
     ParallelSelectR(0, func(url string) T {
-        var i Item; json.Unmarshal(webRequest(url), &i); return i; }).
+        var i Item; json.Unmarshal(webRequest(url), &i); return i }).
     WhereR(isInteresting).
     ParallelForEachR(0, insertIntoDatabase)
 
